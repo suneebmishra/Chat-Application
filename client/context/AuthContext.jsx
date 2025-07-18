@@ -83,6 +83,7 @@ export const AuthProvider = ({ children }) => {
             query: {
                 userId: userData._id,
             },
+            transports: ["websocket"],
         });
 
         socketRef.current = newSocket;

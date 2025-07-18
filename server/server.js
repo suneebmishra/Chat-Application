@@ -13,7 +13,8 @@ const server = http.createServer(app);
 
 // Initialise Socket.io server
 export const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: { origin: "*" },
+    methods: ["GET", "POST"],
 });
 
 // Store online users with multiple sockets

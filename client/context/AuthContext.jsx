@@ -80,6 +80,7 @@ export const AuthProvider = ({ children }) => {
         if (!userData || socketRef.current?.connected) return;
 
         const newSocket = io(backendUrl, {
+            transports: ["polling"],
             query: {
                 userId: userData._id,
             },

@@ -7,43 +7,56 @@ import userRouter from './routes/userRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import { Server } from "socket.io";
 
-// Create an Express app and HTTP server
+// Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 
-// Initialise Socket.io server
+// Initialize Socket.IO server with CORS settings
 export const io = new Server(server, {
-    cors: { origin: "*" }
+  cors: {
+    origin: "*", // Or restrict to your frontend domain
+    methods: ["GET", "POST"]
+  }
 });
 
-// Store online users with multiple sockets
+// Store multiple sockets per user
 export const userSocketMap = {}; // { userId: [socketId1, socketId2, ...] }
 
-// Socket.io connection handler
+// Validate query param before connection is allowed
+io.use((socket, next) => {
+  const userId = socket.handshake.query.userId;
+  if (!userId) {
+    return next(new Error("userId is required in query"));
+  }
+  next();
+});
+
+// Handle socket connections
 io.on("connection", (socket) => {
-    const userId = socket.handshake.query.userId;
-    console.log("User Connected", userId);
+  const userId = socket.handshake.query.userId;
+  console.log("User connected:", userId);
 
-    if (userId) {
-        if (!userSocketMap[userId]) {
-            userSocketMap[userId] = [];
-        }
-        userSocketMap[userId].push(socket.id);
+  if (userId) {
+    if (!userSocketMap[userId]) {
+      userSocketMap[userId] = [];
     }
+    userSocketMap[userId].push(socket.id);
+  }
 
-    // Emit online users to all connected clients
+  // Notify all clients of the current online users
+  io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
+  // Handle disconnection
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", userId);
+    if (userId && userSocketMap[userId]) {
+      userSocketMap[userId] = userSocketMap[userId].filter(id => id !== socket.id);
+      if (userSocketMap[userId].length === 0) {
+        delete userSocketMap[userId];
+      }
+    }
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
-
-    socket.on("disconnect", () => {
-        console.log("User Disconnected", userId);
-        if (userId && userSocketMap[userId]) {
-            userSocketMap[userId] = userSocketMap[userId].filter(id => id !== socket.id);
-            if (userSocketMap[userId].length === 0) {
-                delete userSocketMap[userId];
-            }
-        }
-        io.emit("getOnlineUsers", Object.keys(userSocketMap));
-    });
+  });
 });
 
 // Middleware setup
@@ -58,10 +71,9 @@ app.use("/api/messages", messageRouter);
 // Connect to MongoDB
 await connectDB();
 
- if(process.env.NODE_ENV !== "production"){
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => console.log(`Server is running on PORT: ${PORT}`));
- }
+// Always start the server (in all environments)
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server is running on PORT: ${PORT}`));
 
- // Export server for Vercel
- export default server;
+// Export for Vercel (although Vercel is not recommended for sockets)
+export default server;

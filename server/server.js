@@ -7,56 +7,43 @@ import userRouter from './routes/userRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import { Server } from "socket.io";
 
-// Create Express app and HTTP server
+// Create an Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.IO server with CORS settings
+// Initialise Socket.io server
 export const io = new Server(server, {
-  cors: {
-    origin: "*", // Or restrict to your frontend domain
-    methods: ["GET", "POST"]
-  }
+    cors: { origin: "*" }
 });
 
-// Store multiple sockets per user
+// Store online users with multiple sockets
 export const userSocketMap = {}; // { userId: [socketId1, socketId2, ...] }
 
-// Validate query param before connection is allowed
-io.use((socket, next) => {
-  const userId = socket.handshake.query.userId;
-  if (!userId) {
-    return next(new Error("userId is required in query"));
-  }
-  next();
-});
-
-// Handle socket connections
+// Socket.io connection handler
 io.on("connection", (socket) => {
-  const userId = socket.handshake.query.userId;
-  console.log("User connected:", userId);
+    const userId = socket.handshake.query.userId;
+    console.log("User Connected", userId);
 
-  if (userId) {
-    if (!userSocketMap[userId]) {
-      userSocketMap[userId] = [];
+    if (userId) {
+        if (!userSocketMap[userId]) {
+            userSocketMap[userId] = [];
+        }
+        userSocketMap[userId].push(socket.id);
     }
-    userSocketMap[userId].push(socket.id);
-  }
 
-  // Notify all clients of the current online users
-  io.emit("getOnlineUsers", Object.keys(userSocketMap));
-
-  // Handle disconnection
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", userId);
-    if (userId && userSocketMap[userId]) {
-      userSocketMap[userId] = userSocketMap[userId].filter(id => id !== socket.id);
-      if (userSocketMap[userId].length === 0) {
-        delete userSocketMap[userId];
-      }
-    }
+    // Emit online users to all connected clients
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
-  });
+
+    socket.on("disconnect", () => {
+        console.log("User Disconnected", userId);
+        if (userId && userSocketMap[userId]) {
+            userSocketMap[userId] = userSocketMap[userId].filter(id => id !== socket.id);
+            if (userSocketMap[userId].length === 0) {
+                delete userSocketMap[userId];
+            }
+        }
+        io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    });
 });
 
 // Middleware setup
@@ -71,9 +58,10 @@ app.use("/api/messages", messageRouter);
 // Connect to MongoDB
 await connectDB();
 
-// Always start the server (in all environments)
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server is running on PORT: ${PORT}`));
+ if(process.env.NODE_ENV !== "production"){
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => console.log(`Server is running on PORT: ${PORT}`));
+ }
 
-// Export for Vercel (although Vercel is not recommended for sockets)
-export default server;
+ // Export server for Vercel
+ export default server;

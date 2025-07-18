@@ -13,8 +13,8 @@ const server = http.createServer(app);
 
 // Initialise Socket.io server
 export const io = new Server(server, {
-    cors: { origin: "*" },
-    methods: ["GET", "POST"],
+    origin: "https://chat-application-nu-five.vercel.app",  // your frontend URL
+  credentials: true
 });
 
 // Store online users with multiple sockets
@@ -49,7 +49,11 @@ io.on("connection", (socket) => {
 
 // Middleware setup
 app.use(express.json({ limit: '4mb' }));
-app.use(cors());
+app.use(cors({
+  origin: "https://chat-application-nu-five.vercel.app",
+  credentials: true
+}));
+
 
 // Route Setup
 app.use("/api/status", (req, res) => res.send("Server is live!"));
